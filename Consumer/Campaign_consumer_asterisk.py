@@ -47,13 +47,13 @@ def callback(ch, method, properties, body):
             query=f"UPDATE customers SET `process_id`='{process_id}' , `process_time`= '{time_now}' where id={data['id']}"
             cursor.execute(query)
             sqlconnection.commit()
-            ch.basic_ack(delivery_tag = method.delivery_tag)
+            ch.basic_ack(delivery_tag = method.delivery_tag) # Sending Acknowledgement that the Message was Recieved and Processed.
         else:
            genlog.info(" [X] Call was not Picked Up by the Agent")
            ch.basic_ack(delivery_tag = method.delivery_tag)
 
     else:
-        ch.basic_ack(delivery_tag = method.delivery_tag) # Sending Acknowledgement that the Message was Recieved and Processed.
+        ch.basic_ack(delivery_tag = method.delivery_tag) 
 
 try:
     sqlconnection = mysql.connector.connect(host='10.0.1.98',database='campaign',user='root',password='awais')  # Connecting to the MYSQL Database
