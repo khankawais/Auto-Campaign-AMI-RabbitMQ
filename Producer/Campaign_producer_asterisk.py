@@ -1,17 +1,17 @@
 import mysql.connector
 import sys
 import pika
-from logger import genlog
-credentials = pika.PlainCredentials('admin', 'root')
+from producer_logger import genlog
+RMQcredentials = pika.PlainCredentials('admin', 'root')
 try:
-    connection = pika.BlockingConnection(pika.ConnectionParameters('10.0.0.121',5672,'/',credentials))
-    channel = connection.channel()
-    channel.queue_declare(queue='hello')
+    RMQconnection = pika.BlockingConnection(pika.ConnectionParameters('10.0.0.121',5672,'/',RMQcredentials))
+    RMQchannel = RMQconnection.channel()
+    RMQchannel.queue_declare(queue='hello', durable=True)
     try:
-        connection = mysql.connector.connect(host='10.0.1.98',database='campaign',user='root',password='awais')
-        if connection.is_connected():
+        mysqlconnection = mysql.connector.connect(host='10.0.1.98',database='campaign',user='root',password='awais')
+        if mysqlconnection.is_connected():
             genlog.info("Connection Established with MySQL Server")
-            cursor = connection.cursor()
+            cursor = mysqlconnection.cursor()
             cursor.execute(sys.argv[1])
             Result=cursor.fetchall()
             if len(Result) == 0:
@@ -20,7 +20,7 @@ try:
             else:
                 for result in Result:
                     dictionary={"id":result[0],"name":result[1],"phone_number":result[2],"email":result[3],"process_id":result[4],"process_time":result[5]}                    
-                    channel.basic_publish(exchange='', routing_key='hello', body=str(dictionary))
+                    RMQchannel.basic_publish(exchange='', routing_key='hello', body=str(dictionary),properties=pika.BasicProperties(delivery_mode = 2,))
                     genlog.info("Publish Successfull")
     except mysql.connector.Error as e:
         genlog.error(f"Error while connecting to MySQL : {e}")
@@ -28,8 +28,8 @@ try:
         
         
     finally:
-        if (connection.is_connected()):
+        if (mysqlconnection.is_connected()):
             cursor.close()
-            connection.close()
+            RMQconnection.close()
 except:
     genlog.error("Error while connecting to RabbitMQ Server !!") 

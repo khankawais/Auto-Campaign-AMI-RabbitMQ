@@ -1,16 +1,16 @@
 import pika
 import mysql.connector
 import datetime
-from logger import genlog
+from consumer_logger import genlog
 import asterisk.manager
 
 RMQcredentials = pika.PlainCredentials('admin', 'root')
 RMQconnection = pika.BlockingConnection(pika.ConnectionParameters('10.0.0.121',5672,'/',RMQcredentials))
 RMQchannel = RMQconnection.channel()
-RMQchannel.queue_declare(queue='hello')
+RMQchannel.queue_declare(queue='hello', durable=True)
 
 AMImanager = asterisk.manager.Manager()
-AMImanager.connect('10.0.1.169')
+AMImanager.connect('10.0.1.155')
 AMImanager.login('awais', 'awais')
 
 
@@ -47,15 +47,18 @@ def callback(ch, method, properties, body):
             query=f"UPDATE customers SET `process_id`='{process_id}' , `process_time`= '{time_now}' where id={data['id']}"
             cursor.execute(query)
             sqlconnection.commit()
+            ch.basic_ack(delivery_tag = method.delivery_tag)
         else:
            genlog.info(" [X] Call was not Picked Up")
+           ch.basic_ack(delivery_tag = method.delivery_tag)
 
-        
+    else:
+        ch.basic_ack(delivery_tag = method.delivery_tag)
 
 try:
     sqlconnection = mysql.connector.connect(host='10.0.1.98',database='campaign',user='root',password='awais')
     cursor = sqlconnection.cursor()
-    RMQchannel.basic_consume(queue='hello', on_message_callback=callback, auto_ack=True)
+    RMQchannel.basic_consume(queue='hello', on_message_callback=callback)
     genlog.info(' [*] Waiting for messages. To exit press CTRL+C')
     RMQchannel.start_consuming()
 except mysql.connector.Error as error:
