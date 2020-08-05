@@ -5,21 +5,21 @@ from consumer_logger import genlog
 import asterisk.manager
 
 RMQcredentials = pika.PlainCredentials('admin', 'root')
-RMQconnection = pika.BlockingConnection(pika.ConnectionParameters('10.0.0.121',5672,'/',RMQcredentials))
+RMQconnection = pika.BlockingConnection(pika.ConnectionParameters('10.0.0.121',5672,'/',RMQcredentials)) # Connecting to RabbitMQ Server
 RMQchannel = RMQconnection.channel()
-RMQchannel.queue_declare(queue='hello', durable=True)
+RMQchannel.queue_declare(queue='hello', durable=True) # Creating a Duable Queue .. it will not be created if the queue already exists.
 
 AMImanager = asterisk.manager.Manager()
 AMImanager.connect('10.0.1.155')
-AMImanager.login('awais', 'awais')
+AMImanager.login('awais', 'awais') # Login to the Asterisk Manager Interface ( AMI ) 
 
 
 def callback(ch, method, properties, body):
-    global cursor
-    global sqlconnection
-    body=body.decode("utf-8")
-    data=eval(body)
-    genlog.info(f" [x] Received {data}")
+    global cursor # Mysql Object to Execute Queries
+    global sqlconnection # Mysql Connection Object
+    body=body.decode("utf-8") # Decoding bytes into String ( UTF-8 )
+    data=eval(body)  # Evaluating string to be a Dictionary
+    genlog.info(f" [x] Received {data}") # Writing into log file
     phone=data["phone_number"]
     if int(phone) != 0:
 
@@ -36,10 +36,10 @@ def callback(ch, method, properties, body):
         earlymedia='false', 
         account=None, 
         variables={'UEXT':phone,'NAME':data["name"]}
-        )
+        )   # Calling Originate Action For AMI
 
         if str(response) == "Success":
-            genlog.info("[+] Call was Picked Up")
+            genlog.info("[+] Call was Picked Up by the Agent")
             process_id=data["process_id"]
             process_id=int(process_id)+1
             time_now=str(datetime.datetime.now())
@@ -49,17 +49,17 @@ def callback(ch, method, properties, body):
             sqlconnection.commit()
             ch.basic_ack(delivery_tag = method.delivery_tag)
         else:
-           genlog.info(" [X] Call was not Picked Up")
+           genlog.info(" [X] Call was not Picked Up by the Agent")
            ch.basic_ack(delivery_tag = method.delivery_tag)
 
     else:
-        ch.basic_ack(delivery_tag = method.delivery_tag)
+        ch.basic_ack(delivery_tag = method.delivery_tag) # Sending Acknowledgement that the Message was Recieved and Processed.
 
 try:
-    sqlconnection = mysql.connector.connect(host='10.0.1.98',database='campaign',user='root',password='awais')
+    sqlconnection = mysql.connector.connect(host='10.0.1.98',database='campaign',user='root',password='awais')  # Connecting to the MYSQL Database
     cursor = sqlconnection.cursor()
     RMQchannel.basic_consume(queue='hello', on_message_callback=callback)
-    genlog.info(' [*] Waiting for messages. To exit press CTRL+C')
+    genlog.info(' [*] Waiting for messages')
     RMQchannel.start_consuming()
 except mysql.connector.Error as error:
     genlog.error("Failed to update table record: {}".format(error))
